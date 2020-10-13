@@ -1,2 +1,17 @@
 # leaf_lidar
 Processing code for the LEAF laser scanner
+
+Introduction
+LEAF Mk1 is a portable Terrestrial Laser Scanner (TLS) designed for vegetation structure monitoring. The system is tripod-mounted and solar powered. It uses a 905 nm Class 1M laser for time-of-flight range measurements. LEAF is a scientific instrument designed and manufactured in Australia by Environmental Sensing Systems, based in Melbourne. Scientific applications include long-term studies of forest change in response to climatic events and monitoring of leaf area as an indication of growth and condition. With emphasis on temporal sampling, LEAF is a low spatial resolution TLS. It is not intended to be spatially comparable to TLS instruments designed for engineering, architectural or 3D visualisation applications. The LEAF instrument is made up of four parts, (i) Sensor Head, (ii) Power Box, (iii) Tripod and (iv) Solar Panel. The power box is incorporated in a Pelican 1300 case. The tripod can be any survey style flat-topped tripod with 5/8” 11 TPI thread. The solar panel is only required for long-term unattended operation. Solar panel size varies depending on vegetation density, but typically ranges from 40W in open woodland environments, to 80W in more dense forest. All solar panels have a nominal 20 to 21V voltage output.
+
+Data Format
+A scan files stores the laser directional information and range measurements for each LEAF scan. Scan files are created in text-readable comma-delimited (*.csv) format. There are 15 rows of metadata at the start of the scan file. There are an additional 6 rows of metadata at the end of the scan file. Automated processing scripts should be designed to either skip or parse metadata rows separately from the main scan data. All metadata rows start with the hash character ‘#’. Hemi scan files and hinge scan files have the same format and structure.
+
+Filenames are based on the following format:
+[serial number]_[scan count]_[scan type]_YYYYMMDD-hhmmssZ_[zenith shots]_[azimuth_shots].csv
+
+An example filename is: ‘ESS00363_0006_hemi_20190609-101638Z_0200_0100.csv’
+
+From the filename we can ascertain the identity of the LEAF instrument, the sequential order in which the scan was acquired (relative to other scans), the scan type (either ‘hemi’ or ‘hinge’) the date and time of the scan (in UTC time) and the spatial resolution of the scan as indicated by the number of shots acquired in the zenith and azimuth planes.
+The most critical information acquired during a LEAF scan is the lidar pointing direction and the range to target. The LEAF instrument has two ‘encoders’ that track movement of the lidar in the azimuth and zenith planes. Movement about azimuth is measured by the ‘rotary encoder’. Movement in the zenith plane is measured by the ‘scan encoder’. The rotary encoder produces 20,000 ‘pulses’ per 360° rotation. The scan encoder produces 10,000 ‘pulses’ per 360° rotation.
+LEAF scan files contain the scan encoder and rotary encoder values for each laser sample (even if the laser didn’t hit anything). Encoder values, as a fraction of their full resolution, can be used to calculate relative azimuth and zenith angles. For example, a rotary encoder value of 5,000 represents an azimuth angle of ((5000/20000)*360) = 90°, relative to the scan start (zero) position. When combined with a range measurement, azimuth and zenith angles can be used to calculate a point location in 3D space (as XYZ coordinates).
