@@ -29,7 +29,7 @@ os.chdir(BASEPATH)
 import LEAF_functions
 
 DATAFOLDER = BASEPATH + 'data/'                        # INPUT files. This is the folder location for LEAF data input files
-OUTPUTFOLDER = BASEPATH + '/output/'                   # OUTPUT files. This is the folder location for procesed LEAF data files
+OUTPUTFOLDER = BASEPATH + 'output/'                   # OUTPUT files. This is the folder location for procesed LEAF data files
 
 print('Processing LEAF data...')
     
@@ -43,66 +43,54 @@ InstParams = {'tripodHeight':1.1,
               'zIncr':0.1}
 
                 
-flist = glob(DATAFOLDER+'*hemi*.csv')
-full_fname = flist[1]
-print("%s %s" % ('\nProcessing ', full_fname))
+# flist = glob(DATAFOLDER+'*hemi*.csv')
+flist = glob(DATAFOLDER+'*.csv')
+inputFile = flist[0]
+print("%s %s" % ('\nProcessing ', inputFile))
 
 # import csv file into pandas dataframe (no header), skip metadata rows, drop bad lines that would otherwise raise an exception
-df = pd.read_csv(full_fname, header=None, skiprows=15, error_bad_lines=False, warn_bad_lines=True)    
+df = pd.read_csv(inputFile, header=None, skiprows=15, error_bad_lines=False, warn_bad_lines=True)    
 numCols = len(df.columns)
 print('num cols: {:d}'.format(numCols))
 
-df = df[:-6]                                        # drop the bottom six rows of the input datafile (metadata information)
+df = df[:-6]          # drop the bottom six rows of the input datafile (metadata information)
 
 df.drop(df.columns[[0,6]], axis=1, inplace=True)    # delete the sample and millisec columnns
 df.columns = ['scanEnc','rotEnc','range1','intensity','range2']
 df.index.name = 'sample'
 
+# Add the following columns to the dataframe: 'zenithRad','azimuthRad', 'x1', 'y1', 'z1', 'x2', 'y2', 'z2
+df = LEAF_functions.ConvertToXYZ(df, InstParams)
 
-LEAF_functions.ConvertToXYZ(df, InstParams)
+#Null any points that have a range of zero or an intensity of zero - have temporarily removed range2=0 and delta<0.3
+df = LEAF_functions.FilterPoints(df, minRange=0.0, maxDelta=0.3)
 
-LEAF_functions.FilterPoints(df)
+# Work out what scan configuration was used
+shotCount = LEAF_functions.ShotsByZenithRing(df, InstParams, nRings=9)
+print(shotCount['nShots'])
 
+# If its a hinge scan do a hinge profile
 hingeWidthDeg = 1.0
 minRange = 0.3
-profile = LEAF_functions.CalcHingeProfile(df, InstParams, hingeWidthDeg, minRange)
-    
+profile = LEAF_functions.HingeProfile(df, InstParams, hingeWidthDeg, minRange)
+
+# If it's a hemispherical scan then use all the dat to do a full hemi profile
+########## work on this with Darius ###########
+
+
+
+
 # ----- Write output files -----
 
 # output all processed data as comprehensive *.csv file (good for detailed analysis and checking calculations)
-df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(full_fname))[0] + '_xyz.csv', float_format='%.3f')
+df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile))[0] + '_xyz.csv', float_format='%.3f')
 
 # output subset of columns as *.xyz file (mainly used for visualising point clouds)
 xyzCols = ['x1','y1','z1','x2','y2','z2','intensity','delta']
-df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(full_fname))[0] + '.xyz', columns=xyzCols, index=False, float_format='%.2f')                        
+df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile))[0] + '.xyz', columns=xyzCols, index=False, float_format='%.2f')                        
 
 
-FAVDsmooth = profile['FAVD'].rolling(10).mean()                # applying moving average filter 1m high
+smoothing = 10
+LEAF_functions.PlotProfile(profile, smoothing, inputFile, OUTPUTFOLDER)
 
-baseFilename = os.path.splitext(os.path.basename(full_fname))[0]
-legendText = baseFilename.split('Z')[0]
-
-
-#Glenn: probably best if put plotting in a separate function even if it requires re-reading the data
-fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-fig.subplots_adjust(hspace=0.1, wspace=0.1)
-plt.rcParams.update({'font.size': 10})
-# set global tick label sizes for both axes
-plt.rc('xtick',labelsize=8)
-plt.rc('ytick',labelsize=8)
-
-ax1.plot(profile['LAIz'], profile['heightBin'], linewidth=1, label='{}, n={:d}'.format(legendText, max(profile['sumAStep'])))
-#ax1.legend(loc='lower right', shadow=False, ncol=1, prop={'size':8})
-ax1.legend(loc='upper left', shadow=False, ncol=1, prop={'size':8})
-ax1.set_xlabel('Leaf Area Index (LAI)', fontsize=12)
-ax1.set_ylabel('Height (m)', fontsize=12)
-    
-ax2.plot(FAVDsmooth, profile['heightBin'], linewidth=1, label='{}, n={:d}'.format(legendText,max(profile['sumAStep'])))
-ax2.set_xlabel('Foliage Area Volume Density (FAVD)', fontsize=12)
-    
-fig.set_size_inches(11.0, 8.5)
-fig.savefig(OUTPUTFOLDER + 'LAIz_FAVD.jpg', dpi=300, bbox_inches='tight')
-plt.show()        
-    
-    
 
