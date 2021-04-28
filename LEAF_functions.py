@@ -134,6 +134,7 @@ def HingeProfile(df, InstParams, hingeWidthDeg, minRange):
   
     return(Profile)
 
+
 def PlotProfile(profile, smoothing, full_fname, OUTPUTFOLDER):
  
     FAVDsmooth = profile['FAVD'].rolling(smoothing).mean()                # applying moving average filter 1m high

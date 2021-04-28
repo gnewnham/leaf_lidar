@@ -42,7 +42,6 @@ InstParams = {'tripodHeight':1.1,
               'incrRotEncoder':20000.0, 
               'zIncr':0.1}
 
-                
 # flist = glob(DATAFOLDER+'*hemi*.csv')
 flist = glob(DATAFOLDER+'*.csv')
 inputFile = flist[0]
@@ -76,7 +75,8 @@ profile = LEAF_functions.HingeProfile(df, InstParams, hingeWidthDeg, minRange)
 
 # If it's a hemispherical scan then use all the dat to do a full hemi profile
 ########## work on this with Darius ###########
-
+zero = LEAF_functions.getPgap()
+zero = profile = LEAF_functions.HemiProfile()
 
 
 

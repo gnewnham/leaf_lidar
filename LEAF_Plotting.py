@@ -11,7 +11,7 @@ OUTPUTFOLDER = BASEPATH + 'output/'
 # flist = glob(OUTPUTFOLDER+'*xyz.csv')
 flist = glob(OUTPUTFOLDER+'*.xyz')
 infile = flist[1]
-subsample = 2
+subsample = 1
 
 df = pd.read_csv(infile)
 print(df.columns)
