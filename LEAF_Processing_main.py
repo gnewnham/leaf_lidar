@@ -44,7 +44,7 @@ InstParams = {'tripodHeight':1.1,
 
 # flist = glob(DATAFOLDER+'*hemi*.csv')
 flist = glob(DATAFOLDER+'*.csv')
-inputFile = flist[0]
+inputFile = flist[1]
 print("%s %s" % ('\nProcessing ', inputFile))
 
 # import csv file into pandas dataframe (no header), skip metadata rows, drop bad lines that would otherwise raise an exception
@@ -64,21 +64,27 @@ df = LEAF_functions.ConvertToXYZ(df, InstParams)
 #Null any points that have a range of zero or an intensity of zero - have temporarily removed range2=0 and delta<0.3
 df = LEAF_functions.FilterPoints(df, minRange=0.0, maxDelta=0.3)
 
-# Work out what scan configuration was used
-shotCount = LEAF_functions.ShotsByZenithRing(df, InstParams, nRings=9)
-print(shotCount['nShots'])
-
 # If its a hinge scan do a hinge profile
 hingeWidthDeg = 1.0
 minRange = 0.3
-profile = LEAF_functions.HingeProfile(df, InstParams, hingeWidthDeg, minRange)
+profile = LEAF_functions.hingeProfile(df, InstParams, hingeWidthDeg, minRange)
 
 # If it's a hemispherical scan then use all the dat to do a full hemi profile
 ########## work on this with Darius ###########
-zero = LEAF_functions.getPgap()
-zero = profile = LEAF_functions.hemiProfile()
 
+profileParams = {'minZenithDeg':0, 
+              'maxZenithDeg':90, 
+              'nRings':9,
+              'heightStep':0.1}
 
+# Work out what scan configuration was used
+shotCount = LEAF_functions.ShotsByZenithRing(df, InstParams, profileParams)
+print(shotCount['nShots'])
+
+# temp = LEAF_functions.getPgap(df, InstParams, profileParams)
+# print(temp)
+# zero = LEAF_functions.hemiProfile()
+# print(temp)
 
 # ----- Write output files -----
 
@@ -88,7 +94,6 @@ df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile
 # output subset of columns as *.xyz file (mainly used for visualising point clouds)
 xyzCols = ['x1','y1','z1','x2','y2','z2','intensity','delta']
 df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile))[0] + '.xyz', columns=xyzCols, index=False, float_format='%.2f')                        
-
 
 smoothing = 10
 LEAF_functions.PlotProfile(profile, smoothing, inputFile, OUTPUTFOLDER)

@@ -62,7 +62,7 @@ def FilterPoints(df, minRange=0.0, maxDelta=0.3):
     return df
 
 
-def HingeProfile(df, InstParams, hingeWidthDeg, minRange):
+def hingeProfile(df, InstParams, hingeWidthDeg, minRange):
     
 #    hingeWidthDeg=1
 #    minRange=0.3
@@ -90,7 +90,7 @@ def HingeProfile(df, InstParams, hingeWidthDeg, minRange):
     totalShots = np.size(dfZ, 0)
     print('There are {:0d} shots within hinge angle of +/- {:0.2f} deg.'.format(totalShots, hingeWidthDeg))
 
-    #this is really filtering    
+    ### Darius - is this really filtering???
     dfZ = dfZ[(dfZ['Range'] > minRange)]
 
     hitCount = np.size(dfZ, 0)
@@ -137,7 +137,7 @@ def HingeProfile(df, InstParams, hingeWidthDeg, minRange):
 
 def PlotProfile(profile, smoothing, full_fname, OUTPUTFOLDER):
  
-    FAVDsmooth = profile['FAVD'].rolling(smoothing).mean()                # applying moving average filter 1m high
+    FAVDsmooth = profile['FAVD'].rolling(smoothing).mean()      # applying moving average filter 1m high
 
     baseFilename = os.path.splitext(os.path.basename(full_fname))[0]
     legendText = baseFilename.split('Z')[0]
@@ -161,13 +161,17 @@ def PlotProfile(profile, smoothing, full_fname, OUTPUTFOLDER):
     ax2.set_xlabel('Foliage Area Volume Density (FAVD)', fontsize=12)
         
     fig.set_size_inches(11.0, 8.5)
-    fig.savefig(OUTPUTFOLDER + 'LAIz_FAVD.jpg', dpi=300, bbox_inches='tight')
+    fig.savefig(OUTPUTFOLDER + 'LAIz_FAVD.pdf', dpi=300, bbox_inches='tight')
     plt.show()
 
  
-def ShotsByZenithRing(df, InstParams, nRings=9, minZen=0.0, maxZen=np.pi/2.0):
+def ShotsByZenithRing(df, InstParams, profileParams):
 
     # return the number of shots in each of nRings
+
+    minZen = profileParams['minZenithDeg']  * np.pi / 180
+    maxZen = profileParams['maxZenithDeg'] * np.pi / 180
+    nRings = profileParams['nRings']
 
     ringWidth = (maxZen-minZen) / nRings
     halfWidth = ringWidth/2.0
@@ -188,9 +192,65 @@ def ShotsByZenithRing(df, InstParams, nRings=9, minZen=0.0, maxZen=np.pi/2.0):
     return shotCount
 
 
-def getPgap():
+def getPgap(df, InstParams, profileParams):
     #return the Pgap profile by zenith ring, ie 2d array
-    return 0
+
+    pct999Z = dfZ['z'].quantile(0.999)                    # 99.9%
+
+		
+	nHeights = n_elements(heights)
+	nRings = n_elements(lowerRing)
+	PgapZ = fltarr(nRings, nHeights)
+	
+	ringMeanAngle = 0.5 * (lowerRing + upperRing)
+	dH = heights[1] - heights[0]
+	
+	envi_open_file, filename, r_fid=infid, /no_realize
+	envi_file_query, infid, dims=dims, bnames=bnames
+	
+	;work out what the range band name should be; depends on the scanner type
+	htBNum = where(strcmp(bnames, HeightBandName, /fold_case))
+	zenBNum = where(strcmp(bnames, ZenithBandName, /fold_case))
+	rngBNum = where(strcmp(bnames, RangeBandName, /fold_case))
+	
+	Zarray = ENVI_GET_DATA(fid=infid, dims=dims, pos=htBNum) + instrumentHt
+	zeniths = ENVI_GET_DATA(fid=infid, dims=dims, pos=zenBNum)
+	ranges = ENVI_GET_DATA(fid=infid, dims=dims, pos=rngBNum)
+	
+	if strlen(nPulseBandName) gt 0 then begin
+		nPulseBNum = where(strcmp(bnames, nPulseBandName, /fold_case))
+		npulses = 	ENVI_GET_DATA(fid=infid, dims=dims, pos=nPulseBNum)
+	endif else begin
+		npulses = 	(ranges * 0.0) + 1.0
+	endelse
+	
+	for rnum=0,nRings-1 do begin
+	
+		if strlen(nPulseBandName) gt 0 then begin
+			index = where((zeniths gt lowerRing[rnum]) and (zeniths le upperRing[rnum]) and $
+				(npulses eq 1), nShots)
+		endif else begin
+			index = where((zeniths gt lowerRing[rnum]) and (zeniths le upperRing[rnum]), nShots)
+		endelse
+		ringShots = Zarray[index]
+		ringRanges = ranges[index]
+		hits = ringShots[where(finite(ringShots) and (ringRanges gt minRange) and $
+			(ringRanges le maxRange), nHits)]
+		nShots = float(nShots)
+		nHits = float(nHits)
+		
+		print, lowerRing[rnum], upperRing[rnum], ringMeanAngle[rnum], nShots, nHits, 1-(nHits/nShots)
+		
+		if nHits gt 0 then begin
+			sortIndex = sort(hits)
+			Z = hits[sortIndex]
+			Pgap = 1.0 - (findgen(nHits) / nShots)
+			
+			for h=0,n_elements(heights)-1 do begin
+				PgapZ[rnum,h] = 1.0 - (total(Z le heights[h]) / nShots)
+			;print, heights[h], total(Z le heights[h])
+	
+	return, PgapZ
 
 
 def hemiProfile():
