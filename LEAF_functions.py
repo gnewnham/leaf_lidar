@@ -62,12 +62,9 @@ def FilterPoints(df, minRange=0.0, maxDelta=0.3):
     return df
 
 
-def hingeProfile(df, InstParams, hingeWidthDeg, minRange):
-    
-#    hingeWidthDeg=1
-#    minRange=0.3
-    
-    # -------------- calculate LAI profiles ---------------------
+def hingeProfile(df, InstParams, profileParams):
+        
+    # -------------- calculate LAI hinge profiles ---------------------
     
     dfZ = df[['x1','y1','z1','zenithRad','range1']].copy()
     dfZ.columns = ['x','y','z','zenithRad','Range']
@@ -77,7 +74,7 @@ def hingeProfile(df, InstParams, hingeWidthDeg, minRange):
 
     hingeAngleRadians = np.arctan(np.pi/2.0)
     dtor = np.pi/180.0
-    hingeWidth = hingeWidthDeg * dtor
+    hingeWidth = profileParams['hingeWidthDeg'] * dtor
     hinge = {'Min':hingeAngleRadians-hingeWidth, 'Max':hingeAngleRadians+hingeWidth}
  
     #not sure what happens when no points are found within the range
@@ -88,10 +85,10 @@ def hingeProfile(df, InstParams, hingeWidthDeg, minRange):
     dfZ['z'] = (dfZ['z'] - InstParams['tripodHeight'] - InstParams['instrumentHeight'])    
     
     totalShots = np.size(dfZ, 0)
-    print('There are {:0d} shots within hinge angle of +/- {:0.2f} deg.'.format(totalShots, hingeWidthDeg))
+    print('There are {:0d} shots within hinge angle of +/- {:0.2f} deg.'.format(totalShots, profileParams['hingeWidthDeg']))
 
     ### Darius - is this really filtering???
-    dfZ = dfZ[(dfZ['Range'] > minRange)]
+    dfZ = dfZ[(dfZ['Range'] > InstParams['rangeMin'])]
 
     hitCount = np.size(dfZ, 0)
     print('Number of hits:', hitCount)
@@ -104,8 +101,8 @@ def hingeProfile(df, InstParams, hingeWidthDeg, minRange):
     print('Hinge angle shots Min, Max Z: {:0.2f}, {:0.2f}'.format(minZ,maxZ))
     print('Hinge angle 0.1%, 99.9% height: {:0.2f}, {:0.2f}'.format(pct001Z,pct999Z))
     
-    binCount = int((pct999Z/InstParams['zIncr'])+1)
-    pct999ZRounded = float('{:0.1f}'.format(binCount*InstParams['zIncr']))
+    binCount = int((pct999Z/profileParams['heightStep'])+1)
+    pct999ZRounded = float('{:0.1f}'.format(binCount*profileParams['heightStep']))
     heightBin = np.linspace(0, pct999ZRounded, binCount+1)
     
     shotCountZ = dfZ['z'].groupby(pd.cut(dfZ['z'],heightBin)).count()
@@ -123,7 +120,7 @@ def hingeProfile(df, InstParams, hingeWidthDeg, minRange):
         Pgapz = (1.0 - float(float(sumZStep)/float(totalShots)))
         LAIz = (-1.1 * np.log(Pgapz))
         if(i > 0): 
-            FAVD = ((LAIz-Profile['LAIz'][i-1])/InstParams['zIncr']) 
+            FAVD = ((LAIz-Profile['LAIz'][i-1])/profileParams['heightStep']) 
         else: 
             FAVD = 0.0
         Profile.loc[i+1] = [heightBin[i], Pgapz, LAIz, FAVD, sumZStep]
@@ -195,62 +192,62 @@ def ShotsByZenithRing(df, InstParams, profileParams):
 def getPgap(df, InstParams, profileParams):
     #return the Pgap profile by zenith ring, ie 2d array
 
-    pct999Z = dfZ['z'].quantile(0.999)                    # 99.9%
+    dfZ = df[['x1','y1','z1','zenithRad','range1']].copy()
+    dfZ.columns = ['x','y','z','zenithRad','Range']
 
-		
-	nHeights = n_elements(heights)
-	nRings = n_elements(lowerRing)
-	PgapZ = fltarr(nRings, nHeights)
-	
-	ringMeanAngle = 0.5 * (lowerRing + upperRing)
-	dH = heights[1] - heights[0]
-	
-	envi_open_file, filename, r_fid=infid, /no_realize
-	envi_file_query, infid, dims=dims, bnames=bnames
-	
-	;work out what the range band name should be; depends on the scanner type
-	htBNum = where(strcmp(bnames, HeightBandName, /fold_case))
-	zenBNum = where(strcmp(bnames, ZenithBandName, /fold_case))
-	rngBNum = where(strcmp(bnames, RangeBandName, /fold_case))
-	
-	Zarray = ENVI_GET_DATA(fid=infid, dims=dims, pos=htBNum) + instrumentHt
-	zeniths = ENVI_GET_DATA(fid=infid, dims=dims, pos=zenBNum)
-	ranges = ENVI_GET_DATA(fid=infid, dims=dims, pos=rngBNum)
-	
-	if strlen(nPulseBandName) gt 0 then begin
-		nPulseBNum = where(strcmp(bnames, nPulseBandName, /fold_case))
-		npulses = 	ENVI_GET_DATA(fid=infid, dims=dims, pos=nPulseBNum)
-	endif else begin
-		npulses = 	(ranges * 0.0) + 1.0
-	endelse
-	
-	for rnum=0,nRings-1 do begin
-	
-		if strlen(nPulseBandName) gt 0 then begin
-			index = where((zeniths gt lowerRing[rnum]) and (zeniths le upperRing[rnum]) and $
-				(npulses eq 1), nShots)
-		endif else begin
-			index = where((zeniths gt lowerRing[rnum]) and (zeniths le upperRing[rnum]), nShots)
-		endelse
-		ringShots = Zarray[index]
-		ringRanges = ranges[index]
-		hits = ringShots[where(finite(ringShots) and (ringRanges gt minRange) and $
-			(ringRanges le maxRange), nHits)]
-		nShots = float(nShots)
-		nHits = float(nHits)
-		
-		print, lowerRing[rnum], upperRing[rnum], ringMeanAngle[rnum], nShots, nHits, 1-(nHits/nShots)
-		
-		if nHits gt 0 then begin
-			sortIndex = sort(hits)
-			Z = hits[sortIndex]
-			Pgap = 1.0 - (findgen(nHits) / nShots)
-			
-			for h=0,n_elements(heights)-1 do begin
-				PgapZ[rnum,h] = 1.0 - (total(Z le heights[h]) / nShots)
-			;print, heights[h], total(Z le heights[h])
-	
-	return, PgapZ
+    minZen = profileParams['minZenithDeg']  * np.pi / 180
+    maxZen = profileParams['maxZenithDeg'] * np.pi / 180
+    nRings = profileParams['nRings']
+    rangeMax = InstParams['rangeMax']
+    dH = profileParams['heightStep']
+
+    ringWidth = (maxZen-minZen) / nRings
+    halfWidth = ringWidth/2.0
+    ringCentres = np.arange(minZen+halfWidth, maxZen, ringWidth)
+    ringCentresDeg = ringCentres / np.pi * 180
+
+    ranges = np.round(np.arange(0, rangeMax, dH),2)
+    nRanges =ranges.size
+
+    PgapDF = pd.DataFrame(index=ranges, columns=ringCentresDeg)
+    print(PgapDF)
+
+    for ring in range(0,nRings):
+        
+        for r in ranges:
+
+            # print(ring)
+            q=1
+
+        q=1
+        # print(r)
+
+    # for rnum=0,nRings-1 do begin
+
+    # 	if strlen(nPulseBandName) gt 0 then begin
+    # 		index = where((zeniths gt lowerRing[rnum]) and (zeniths le upperRing[rnum]) and $
+    # 			(npulses eq 1), nShots)
+    # 	endif else begin
+    # 		index = where((zeniths gt lowerRing[rnum]) and (zeniths le upperRing[rnum]), nShots)
+    # 	endelse
+    # 	ringShots = Zarray[index]
+    # 	ringRanges = ranges[index]
+    # 	hits = ringShots[where(finite(ringShots) and (ringRanges gt minRange) and $
+    # 		(ringRanges le maxRange), nHits)]
+    # 	nShots = float(nShots)
+    # 	nHits = float(nHits)
+        
+    # 	print, lowerRing[rnum], upperRing[rnum], ringMeanAngle[rnum], nShots, nHits, 1-(nHits/nShots)
+        
+    # 	if nHits gt 0 then begin
+    # 		sortIndex = sort(hits)
+    # 		Z = hits[sortIndex]
+    # 		Pgap = 1.0 - (findgen(nHits) / nShots)
+        
+    # 		for h=0,n_elements(heights)-1 do begin
+    # 			PgapZ[rnum,h] = 1.0 - (total(Z le heights[h]) / nShots)
+    # 		;print, heights[h], total(Z le heights[h])
+    return 0 #, PgapArray
 
 
 def hemiProfile():

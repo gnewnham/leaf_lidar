@@ -18,6 +18,11 @@ InstParams = {'tripodHeight':1.1,
               'incrRotEncoder':20000.0, 
               'zIncr':0.1}
 
+profileParams = {'minZenithDeg':0, 
+              'maxZenithDeg':90, 
+              'nRings':9,
+              'heightStep':0.1}
+
 flist = glob(DATAFOLDER+'*.csv')
 inputFile = flist[0]
 
@@ -30,7 +35,7 @@ df.columns = ['scanEnc','rotEnc','range1','intensity','range2']
 
 df = LEAF_functions.ConvertToXYZ(df, InstParams)
 
-shotCount = LEAF_functions.ShotsByZenithRing(df, InstParams, nRings=9)
+shotCount = LEAF_functions.ShotsByZenithRing(df, InstParams, profileParams)
 print(shotCount['nShots'])
 
 # # plt.scatter(df['zenithRad'], df['azimuthRad'], c='r')

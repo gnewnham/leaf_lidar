@@ -33,14 +33,23 @@ OUTPUTFOLDER = BASEPATH + 'output/'                   # OUTPUT files. This is th
 
 print('Processing LEAF data...')
     
-pd.options.mode.chained_assignment = None                            # turn off pandas warning about replacing elements in dataframe 'Setting with Copy...'
+pd.options.mode.chained_assignment = None              # turn off pandas warning about replacing elements in dataframe 'Setting with Copy...'
 np.set_printoptions(threshold=sys.maxsize)
 
 InstParams = {'tripodHeight':1.1, 
               'instrumentHeight':0.33, 
               'incrScanEncoder':10000.0, 
               'incrRotEncoder':20000.0, 
-              'zIncr':0.1}
+              'rangeMin':0.3,
+              'rangeMax':100.0,
+              'maxRangeDelta':0.3}
+
+profileParams = {'minZenithDeg':0, 
+              'maxZenithDeg':90, 
+              'nRings':9,
+              'heightStep':0.1,
+              'hingeWidthDeg':2.0,
+              'smoothing':10}
 
 # flist = glob(DATAFOLDER+'*hemi*.csv')
 flist = glob(DATAFOLDER+'*.csv')
@@ -62,40 +71,33 @@ df.index.name = 'sample'
 df = LEAF_functions.ConvertToXYZ(df, InstParams)
 
 #Null any points that have a range of zero or an intensity of zero - have temporarily removed range2=0 and delta<0.3
-df = LEAF_functions.FilterPoints(df, minRange=0.0, maxDelta=0.3)
+df = LEAF_functions.FilterPoints(df, InstParams['rangeMin'], InstParams['maxRangeDelta'])
 
 # If its a hinge scan do a hinge profile
-hingeWidthDeg = 1.0
-minRange = 0.3
-profile = LEAF_functions.hingeProfile(df, InstParams, hingeWidthDeg, minRange)
+profile = LEAF_functions.hingeProfile(df, InstParams, profileParams)
 
-# If it's a hemispherical scan then use all the dat to do a full hemi profile
+# If it's a hemispherical scan then use all the data to do a full hemi profile
 ########## work on this with Darius ###########
-
-profileParams = {'minZenithDeg':0, 
-              'maxZenithDeg':90, 
-              'nRings':9,
-              'heightStep':0.1}
 
 # Work out what scan configuration was used
 shotCount = LEAF_functions.ShotsByZenithRing(df, InstParams, profileParams)
 print(shotCount['nShots'])
 
-# temp = LEAF_functions.getPgap(df, InstParams, profileParams)
-# print(temp)
+temp = LEAF_functions.getPgap(df, InstParams, profileParams)
+print('Temp = ', temp)
 # zero = LEAF_functions.hemiProfile()
 # print(temp)
 
 # ----- Write output files -----
 
-# output all processed data as comprehensive *.csv file (good for detailed analysis and checking calculations)
-df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile))[0] + '_xyz.csv', float_format='%.3f')
+# # output all processed data as comprehensive *.csv file (good for detailed analysis and checking calculations)
+# df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile))[0] + '_xyz.csv', float_format='%.3f')
 
-# output subset of columns as *.xyz file (mainly used for visualising point clouds)
-xyzCols = ['x1','y1','z1','x2','y2','z2','intensity','delta']
-df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile))[0] + '.xyz', columns=xyzCols, index=False, float_format='%.2f')                        
+# # output subset of columns as *.xyz file (mainly used for visualising point clouds)
+# xyzCols = ['x1','y1','z1','x2','y2','z2','intensity','delta']
+# df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile))[0] + '.xyz', columns=xyzCols, index=False, float_format='%.2f')                        
 
-smoothing = 10
-LEAF_functions.PlotProfile(profile, smoothing, inputFile, OUTPUTFOLDER)
+# ----- plot  profiles to the screen -----
+LEAF_functions.PlotProfile(profile, profileParams['smoothing'], inputFile, OUTPUTFOLDER)
 
 
