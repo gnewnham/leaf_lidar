@@ -177,9 +177,9 @@ def ShotsByZenithRing(df, InstParams, profileParams):
     nShots = np.zeros(nRings)
 
     for i in range(nRings):
-        minZen = ringCentres[i]-halfWidth
-        maxZen = ringCentres[i]+halfWidth
-        mask = ((df['zenithRad'] > minZen) & (df['zenithRad'] < maxZen))
+        ringMin = ringCentres[i]-halfWidth
+        ringMax = ringCentres[i]+halfWidth
+        mask = ((df['zenithRad'] > ringMin) & (df['zenithRad'] < ringMax))
         nShots[i] = np.sum(mask)
 
     shotCount = {'ringCentresDeg':ringCentresDeg, 
@@ -190,64 +190,52 @@ def ShotsByZenithRing(df, InstParams, profileParams):
 
 
 def getPgap(df, InstParams, profileParams):
-    #return the Pgap profile by zenith ring, ie 2d array
 
-    dfZ = df[['x1','y1','z1','zenithRad','range1']].copy()
-    dfZ.columns = ['x','y','z','zenithRad','Range']
+    #returns a Pgap profile by zenith ring, ie 2d array
 
     minZen = profileParams['minZenithDeg']  * np.pi / 180
     maxZen = profileParams['maxZenithDeg'] * np.pi / 180
     nRings = profileParams['nRings']
+
+    heightMax = df['z1'].quantile(0.999)           # 99.9%
+    dZ = profileParams['heightStep']
+    heights = np.round(np.arange(dZ, heightMax+dZ, dZ),2)
+    nHeights = heights.size
+
+    rangeMin = InstParams['rangeMin']
     rangeMax = InstParams['rangeMax']
-    dH = profileParams['heightStep']
+    # ranges = np.round(np.arange(dR, rangeMax+dR, dR),2)
+    # nRanges =ranges.size
 
     ringWidth = (maxZen-minZen) / nRings
     halfWidth = ringWidth/2.0
     ringCentres = np.arange(minZen+halfWidth, maxZen, ringWidth)
-    ringCentresDeg = ringCentres / np.pi * 180
+    ringCentresDeg = np.round(ringCentres / np.pi * 180)
 
-    ranges = np.round(np.arange(0, rangeMax, dH),2)
-    nRanges =ranges.size
+    PgapDF = pd.DataFrame(index=heights, columns=ringCentresDeg)
 
-    PgapDF = pd.DataFrame(index=ranges, columns=ringCentresDeg)
-    print(PgapDF)
-
-    for ring in range(0,nRings):
+    for ringNum in range(0,nRings):
+        ringMin = ringCentres[ringNum]-halfWidth
+        ringMax = ringCentres[ringNum]+halfWidth
+        #shots within the ring
+        mask = ((df['zenithRad'] > ringMin) & (df['zenithRad'] < ringMax))        
+        nRingShots = np.sum(mask)
         
-        for r in ranges:
+        if (nRingShots > 0):
+            dfRing = df[mask]
+            for zNum in range(0,nHeights):
+                z = heights[zNum]
+                zLow = z - dZ
+                zHigh = z
+                #hits below z layer
+                mask = ((dfRing['range1'] > rangeMin) & (dfRing['range1'] < rangeMax) & (dfRing['z1'] < zHigh))
+                nHits = np.sum(mask)
 
-            # print(ring)
-            q=1
+                # test if beam exits top of height layer
+                if (rangeMax*np.cos(ringCentres[ringNum]) > zHigh):
+                    PgapDF.iloc[zNum, ringNum] = 1.0 - nHits / nRingShots
 
-        q=1
-        # print(r)
-
-    # for rnum=0,nRings-1 do begin
-
-    # 	if strlen(nPulseBandName) gt 0 then begin
-    # 		index = where((zeniths gt lowerRing[rnum]) and (zeniths le upperRing[rnum]) and $
-    # 			(npulses eq 1), nShots)
-    # 	endif else begin
-    # 		index = where((zeniths gt lowerRing[rnum]) and (zeniths le upperRing[rnum]), nShots)
-    # 	endelse
-    # 	ringShots = Zarray[index]
-    # 	ringRanges = ranges[index]
-    # 	hits = ringShots[where(finite(ringShots) and (ringRanges gt minRange) and $
-    # 		(ringRanges le maxRange), nHits)]
-    # 	nShots = float(nShots)
-    # 	nHits = float(nHits)
-        
-    # 	print, lowerRing[rnum], upperRing[rnum], ringMeanAngle[rnum], nShots, nHits, 1-(nHits/nShots)
-        
-    # 	if nHits gt 0 then begin
-    # 		sortIndex = sort(hits)
-    # 		Z = hits[sortIndex]
-    # 		Pgap = 1.0 - (findgen(nHits) / nShots)
-        
-    # 		for h=0,n_elements(heights)-1 do begin
-    # 			PgapZ[rnum,h] = 1.0 - (total(Z le heights[h]) / nShots)
-    # 		;print, heights[h], total(Z le heights[h])
-    return 0 #, PgapArray
+    return PgapDF
 
 
 def hemiProfile():

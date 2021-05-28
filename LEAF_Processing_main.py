@@ -47,7 +47,7 @@ InstParams = {'tripodHeight':1.1,
 profileParams = {'minZenithDeg':0, 
               'maxZenithDeg':90, 
               'nRings':9,
-              'heightStep':0.1,
+              'heightStep':5.0,
               'hingeWidthDeg':2.0,
               'smoothing':10}
 
@@ -83,12 +83,17 @@ profile = LEAF_functions.hingeProfile(df, InstParams, profileParams)
 shotCount = LEAF_functions.ShotsByZenithRing(df, InstParams, profileParams)
 print(shotCount['nShots'])
 
-temp = LEAF_functions.getPgap(df, InstParams, profileParams)
-print('Temp = ', temp)
+PgapDF = LEAF_functions.getPgap(df, InstParams, profileParams)
+print('Pgap Array = ', PgapDF)
+
 # zero = LEAF_functions.hemiProfile()
 # print(temp)
 
-# ----- Write output files -----
+# # ----- plot  profiles to the screen -----
+# LEAF_functions.PlotProfile(profile, profileParams['smoothing'], inputFile, OUTPUTFOLDER)
+
+
+# ----- Write output point cloud files -----
 
 # # output all processed data as comprehensive *.csv file (good for detailed analysis and checking calculations)
 # df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile))[0] + '_xyz.csv', float_format='%.3f')
@@ -96,8 +101,5 @@ print('Temp = ', temp)
 # # output subset of columns as *.xyz file (mainly used for visualising point clouds)
 # xyzCols = ['x1','y1','z1','x2','y2','z2','intensity','delta']
 # df.to_csv(path_or_buf=OUTPUTFOLDER + os.path.splitext(os.path.basename(inputFile))[0] + '.xyz', columns=xyzCols, index=False, float_format='%.2f')                        
-
-# ----- plot  profiles to the screen -----
-LEAF_functions.PlotProfile(profile, profileParams['smoothing'], inputFile, OUTPUTFOLDER)
 
 
