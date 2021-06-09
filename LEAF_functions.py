@@ -5,6 +5,7 @@ Created on Sat Aug 22 14:04:01 2020
 @author: new298
 """
 import numpy as np
+from numpy.lib.shape_base import column_stack
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
@@ -69,15 +70,15 @@ def hingeProfile(df, InstParams, profileParams):
     dfZ = df[['x1','y1','z1','zenithRad','range1']].copy()
     dfZ.columns = ['x','y','z','zenithRad','Range']
     
-    print('Total shots in file (before filtering):', np.size(dfZ, axis=0))    
-    print('Min, Max Z: {:0.2f}, {:0.2f}'.format(dfZ['z'].min(), dfZ['z'].max()))
+    # print('Total shots in file (before filtering):', np.size(dfZ, axis=0))    
+    # print('Min, Max Z: {:0.2f}, {:0.2f}'.format(dfZ['z'].min(), dfZ['z'].max()))
 
     hingeAngleRadians = np.arctan(np.pi/2.0)
     dtor = np.pi/180.0
     hingeWidth = profileParams['hingeWidthDeg'] * dtor
     hinge = {'Min':hingeAngleRadians-hingeWidth, 'Max':hingeAngleRadians+hingeWidth}
  
-    #not sure what happens when no points are found within the range
+    #### we should handle the exception where no points are found within the range
     dfZ['mask'] = (dfZ['zenithRad'] > hinge['Min']) & (dfZ['zenithRad'] < hinge['Max'])
     dfZ = dfZ[dfZ['mask']]
 
@@ -85,47 +86,43 @@ def hingeProfile(df, InstParams, profileParams):
     dfZ['z'] = (dfZ['z'] - InstParams['tripodHeight'] - InstParams['instrumentHeight'])    
     
     totalShots = np.size(dfZ, 0)
-    print('There are {:0d} shots within hinge angle of +/- {:0.2f} deg.'.format(totalShots, profileParams['hingeWidthDeg']))
+    # print('There are {:0d} shots within hinge angle of +/- {:0.2f} deg.'.format(totalShots, profileParams['hingeWidthDeg']))
 
     ### Darius - is this really filtering???
     dfZ = dfZ[(dfZ['Range'] > InstParams['rangeMin'])]
 
     hitCount = np.size(dfZ, 0)
-    print('Number of hits:', hitCount)
+    # print('Number of hits:', hitCount)
     
     minZ = dfZ['z'].min()                                # calculate a few basic z-dimension stats from hinge angle data
     maxZ = dfZ['z'].max()
     pct001Z = dfZ['z'].quantile(0.001)                    # 0.10%
     pct999Z = dfZ['z'].quantile(0.999)                    # 99.9%
     
-    print('Hinge angle shots Min, Max Z: {:0.2f}, {:0.2f}'.format(minZ,maxZ))
-    print('Hinge angle 0.1%, 99.9% height: {:0.2f}, {:0.2f}'.format(pct001Z,pct999Z))
+    # print('Hinge angle shots Min, Max Z: {:0.2f}, {:0.2f}'.format(minZ,maxZ))
+    # print('Hinge angle 0.1%, 99.9% height: {:0.2f}, {:0.2f}'.format(pct001Z,pct999Z))
     
     binCount = int((pct999Z/profileParams['heightStep'])+1)
     pct999ZRounded = float('{:0.1f}'.format(binCount*profileParams['heightStep']))
     heightBin = np.linspace(0, pct999ZRounded, binCount+1)
     
-    shotCountZ = dfZ['z'].groupby(pd.cut(dfZ['z'],heightBin)).count()
+    shotCountZ = dfZ['z'].groupby(pd.cut(dfZ['z'],heightBin)).count().to_numpy()
     hitCount = shotCountZ.sum()
-    print('Number of hinge angle shots to 99.9% height:', hitCount)
-    
-    #check to make sure that height bin is the correct size, Darius removed one height in his code in the plot
-    pf = {'Height':heightBin, 'Pgapz':heightBin*0.0, 'LAIz':heightBin*0.0, 'FAVD':heightBin*0.0, 'sumZStep':heightBin*0.0}
-    Profile = pd.DataFrame(pf)
+    # print('Number of hinge angle shots to 99.9% height:', hitCount)
 
-    sumZStep = 0
-    for i in range(binCount):
-        
-        sumZStep += shotCountZ[i]                        # count the cumulative number of hits from the instrument height upwards...
-        Pgapz = (1.0 - float(float(sumZStep)/float(totalShots)))
-        LAIz = (-1.1 * np.log(Pgapz))
-        if(i > 0): 
-            FAVD = ((LAIz-Profile['LAIz'][i-1])/profileParams['heightStep']) 
-        else: 
-            FAVD = 0.0
-        Profile.loc[i+1] = [heightBin[i], Pgapz, LAIz, FAVD, sumZStep]
-        # print(Profile.loc[i])
-        
+    # Glenn reworked this section to remove the loop and if statements
+    CumCountZ = np.concatenate(([0], np.cumsum(shotCountZ).astype(float)))
+    Pgapz = (1.0 - CumCountZ/float(totalShots))
+    Pgapz_gtZero = np.clip(Pgapz, 1.0E-100, None)  #set all zero or negative Pgap values to a small number
+    LAIz = (-1.1 * np.log(Pgapz_gtZero))
+
+    LAIshift = np.concatenate(([0], LAIz[:-1]))
+    FAVD = ((LAIz-LAIshift)/profileParams['heightStep'])
+
+    #check to make sure that height bin is the correct size, Darius removed one height in his code in the plot
+    pf = {'Height':heightBin, 'Pgapz':Pgapz, 'LAIz':LAIz, 'FAVD':FAVD, 'sumZStep':CumCountZ}
+    Profile = pd.DataFrame(pf)
+    
     # heightBin += (InstParams['tripodHeight'] + InstParams['instrumentHeight'])        # add tripod and instrument height
     # print(heightBin[binCount-1], shotCountZ[binCount-1], sumZStep, 'Top of Canopy PGap {:0.3f} and LAI {:0.3f}'.format(Pgapz[binCount-1],LAIz[binCount-1]))
   
@@ -219,6 +216,7 @@ def getPgap(df, InstParams, profileParams):
         ringMax = ringCentres[ringNum]+halfWidth
         #shots within the ring
         mask = ((df['zenithRad'] > ringMin) & (df['zenithRad'] < ringMax))        
+        #number of shots within the zenith ring
         nRingShots = np.sum(mask)
         
         if (nRingShots > 0):
@@ -227,7 +225,7 @@ def getPgap(df, InstParams, profileParams):
                 z = heights[zNum]
                 zLow = z - dZ
                 zHigh = z
-                #hits below z layer
+                #zenith ring shots returned below z layer
                 mask = ((dfRing['range1'] > rangeMin) & (dfRing['range1'] < rangeMax) & (dfRing['z1'] < zHigh))
                 nHits = np.sum(mask)
 
@@ -238,6 +236,30 @@ def getPgap(df, InstParams, profileParams):
     return PgapDF
 
 
-def hemiProfile():
+def hemiProfile(PgapDF, profileParams):
     #return the vertial L and FAVD profile
+    size = PgapDF.size
+    shape = PgapDF.shape
+    heights = PgapDF.index.to_numpy(dtype=float)
+    zeniths = PgapDF.columns.to_numpy(dtype=float)
+
+    #flatten the Pgap array
+    Fz = np.array(shape[0])
+    for z in range(0,1):#range(0,shape[0]):
+        Y = PgapDF.iloc[z,:].to_numpy(dtype=float)
+
+        X = np.ones((shape[1], 2))
+        X[:,1] = 2.0 / np.pi * np.tan(zeniths*np.pi/180)
+
+        mask = np.isfinite(Y)
+        Y = Y[mask]
+        X = X[mask,:]
+        print('Shape : ', Y.shape, X.shape)
+        mod = np.linalg.lstsq(X, Y, rcond=None)[0]
+        print('Mod: ', mod)
+
+    # print(X.shape, Y.shape)
+    # mod = np.linalg.lstsq(X, Y, rcond=None)
+    # print(mod)
+
     return 0

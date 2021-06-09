@@ -18,6 +18,7 @@
 import os
 import sys
 import time
+from numpy.testing._private.utils import tempdir
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -47,19 +48,19 @@ InstParams = {'tripodHeight':1.1,
 profileParams = {'minZenithDeg':0, 
               'maxZenithDeg':90, 
               'nRings':9,
-              'heightStep':5.0,
+              'heightStep':10.0,
               'hingeWidthDeg':2.0,
               'smoothing':10}
 
 # flist = glob(DATAFOLDER+'*hemi*.csv')
 flist = glob(DATAFOLDER+'*.csv')
 inputFile = flist[1]
-print("%s %s" % ('\nProcessing ', inputFile))
+# print("%s %s" % ('\nProcessing ', inputFile))
 
 # import csv file into pandas dataframe (no header), skip metadata rows, drop bad lines that would otherwise raise an exception
 df = pd.read_csv(inputFile, header=None, skiprows=15, error_bad_lines=False, warn_bad_lines=True)    
 numCols = len(df.columns)
-print('num cols: {:d}'.format(numCols))
+# print('num cols: {:d}'.format(numCols))
 
 df = df[:-6]          # drop the bottom six rows of the input datafile (metadata information)
 
@@ -81,13 +82,13 @@ profile = LEAF_functions.hingeProfile(df, InstParams, profileParams)
 
 # Work out what scan configuration was used
 shotCount = LEAF_functions.ShotsByZenithRing(df, InstParams, profileParams)
-print(shotCount['nShots'])
+# print(shotCount['nShots'])
 
 PgapDF = LEAF_functions.getPgap(df, InstParams, profileParams)
-print('Pgap Array = ', PgapDF)
+# print('Pgap Array = ', PgapDF)
 
-# zero = LEAF_functions.hemiProfile()
-# print(temp)
+temp = LEAF_functions.hemiProfile(PgapDF, profileParams)
+print(temp)
 
 # # ----- plot  profiles to the screen -----
 # LEAF_functions.PlotProfile(profile, profileParams['smoothing'], inputFile, OUTPUTFOLDER)
