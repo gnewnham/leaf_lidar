@@ -130,30 +130,29 @@ def hingeProfile(df, InstParams, profileParams):
 
 
 def PlotProfile(profile, smoothing, full_fname, OUTPUTFOLDER):
- 
-    FAVDsmooth = profile['FAVD'].rolling(smoothing).mean()      # applying moving average filter 1m high
-
-    baseFilename = os.path.splitext(os.path.basename(full_fname))[0]
-    legendText = baseFilename.split('Z')[0]
-
-    #print(profile.describe())
-
+    
     fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+    
+    for i in range(len(profile)):
+        
+        #print(profile[i].describe())
+        FAVDsmooth = profile[i]['FAVD'].rolling(smoothing).mean()      # applying moving average filter
+        baseFilename = os.path.splitext(os.path.basename(full_fname[i]))[0]
+        legendText = baseFilename.split('Z')[0]
+        ax1.plot(profile[i]['LAIz'], profile[i]['Height'], linewidth=1, label='{}, n={:d}'.format(legendText, int(max(profile[i]['sumZStep']))))
+        ax2.plot(FAVDsmooth, profile[i]['Height'], linewidth=1)
+    
     fig.subplots_adjust(hspace=0.1, wspace=0.1)
     plt.rcParams.update({'font.size': 10})
-    # set global tick label sizes for both axes
     plt.rc('xtick',labelsize=8)
     plt.rc('ytick',labelsize=8)
-
-    ax1.plot(profile['LAIz'], profile['Height'], linewidth=1, label='{}, n={:f}'.format(legendText, max(profile['sumZStep'])))
+    
     #ax1.legend(loc='lower right', shadow=False, ncol=1, prop={'size':8})
     ax1.legend(loc='upper left', shadow=False, ncol=1, prop={'size':8})
     ax1.set_xlabel('Leaf Area Index (LAI)', fontsize=12)
     ax1.set_ylabel('Height (m)', fontsize=12)
-        
-    ax2.plot(FAVDsmooth, profile['Height'], linewidth=1, label='{}, n={:f}'.format(legendText,max(profile['sumZStep'])))
     ax2.set_xlabel('Foliage Area Volume Density (FAVD)', fontsize=12)
-        
+    
     fig.set_size_inches(11.0, 8.5)
     fig.savefig(OUTPUTFOLDER + 'LAIz_FAVD.pdf', dpi=300, bbox_inches='tight')
     plt.show()
