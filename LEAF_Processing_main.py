@@ -58,7 +58,7 @@ inputFile = flist[1]
 # print("%s %s" % ('\nProcessing ', inputFile))
 
 # import csv file into pandas dataframe (no header), skip metadata rows, drop bad lines that would otherwise raise an exception
-df = pd.read_csv(inputFile, header=None, skiprows=15, error_bad_lines=False, warn_bad_lines=True)    
+df = pd.read_csv(inputFile, header=None, skiprows=15, on_bad_lines='warn')    
 numCols = len(df.columns)
 # print('num cols: {:d}'.format(numCols))
 
