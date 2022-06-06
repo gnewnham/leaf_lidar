@@ -1,5 +1,5 @@
 # leaf_lidar
-Processing code for the LEAF laser scanner
+## Processing code for the LEAF laser scanner
 
 LEAF Mk1 is a portable Terrestrial Laser Scanner (TLS) designed for vegetation structure monitoring. The system is tripod-mounted and solar powered. It uses a 905 nm Class 1M laser for time-of-flight range measurements. LEAF is a scientific instrument designed and manufactured in Australia by Environmental Sensing Systems, based in Melbourne. Scientific applications include long-term studies of forest change in response to climatic events and monitoring of leaf area as an indication of growth and condition. With emphasis on temporal sampling, LEAF is a low spatial resolution TLS. It is not intended to be spatially comparable to TLS instruments designed for engineering, architectural or 3D visualisation applications. The LEAF instrument is made up of four parts, (i) Sensor Head, (ii) Power Box, (iii) Tripod and (iv) Solar Panel. The power box is incorporated in a Pelican 1300 case. The tripod can be any survey style flat-topped tripod with 5/8” 11 TPI thread. The solar panel is only required for long-term unattended operation. Solar panel size varies depending on vegetation density, but typically ranges from 40W in open woodland environments, to 80W in more dense forest. All solar panels have a nominal 20 to 21V voltage output.
 
